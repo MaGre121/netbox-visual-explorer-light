@@ -1,0 +1,30 @@
+.ve-tools { display:flex; align-items:flex-end; flex-wrap:wrap; gap:.8rem; }
+.ve-tools > label:not(.form-check) { display:grid; gap:.25rem; font-weight:600; flex:1 1 11rem; min-width:0; }
+.ve-tools .form-select { width:100%; font-weight:400; }
+.ve-filters { display:flex; flex-wrap:wrap; gap:.5rem; }
+.ve-filter { position:relative; }
+.ve-filter > div { position:absolute; z-index:6; top:100%; right:0; min-width:15rem; max-height:18rem; overflow:auto; gap:.4rem; }
+.ve-workspace { display:grid; grid-template-columns:minmax(0, 1fr) minmax(15rem, 23%); border-block:1px solid var(--tblr-border-color,#ccd6da); }
+.ve-stage { position:relative; min-width:0; background-color:#f5f8fa; background-image:radial-gradient(#d5dfe4 1px, transparent 1px); background-size:16px 16px; }
+#ve-canvas { height:clamp(28rem, 64vh, 65rem); }
+#ve-canvas svg { display:block; width:100%; height:100%; touch-action:none; cursor:grab; }
+#ve-canvas svg:active { cursor:grabbing; }
+#ve-canvas .node, #ve-canvas .edge, #ve-canvas .cluster[data-plan] { cursor:pointer; }
+#ve-canvas :is(.node,.edge,.cluster):focus { outline:2px solid #0a817b; }
+#ve-canvas :is(.ve-selected,.ve-related) :is(polygon,path,ellipse):not([stroke="transparent"]) { stroke:#007d75; stroke-width:3; }
+.ve-inspector { padding:1rem; overflow:auto; max-height:clamp(28rem, 64vh, 65rem); overflow-wrap:anywhere; }
+.ve-inspector ul { margin:0; padding-left:1.1rem; }
+.ve-entry { padding:.65rem 0; border-bottom:1px solid var(--tblr-border-color,#ccd6da); }
+.ve-entry small { display:block; }
+.ve-camera { position:absolute; bottom:.7rem; left:.7rem; box-shadow:0 2px 8px #21354720; }
+#ve-message { position:absolute; inset:45% 10% auto; text-align:center; color:#33475a; pointer-events:none; }
+@media(max-width:850px) {
+  .ve-workspace { grid-template-columns:1fr; }
+  .ve-inspector { max-height:18rem; }
+  #ve-canvas { height:55vh; }
+}
+
+#ve-device[hidden] { display:none; }
+#ve-device dl { display:grid; grid-template-columns:repeat(auto-fit,minmax(12rem,1fr)); gap:1rem; margin:0; }
+#ve-device dd { margin:0; overflow-wrap:anywhere; }
+#ve-device dt { color:var(--tblr-secondary); font-size:.85rem; }

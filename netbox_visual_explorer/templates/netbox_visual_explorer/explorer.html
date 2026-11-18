@@ -1,0 +1,61 @@
+{% extends 'generic/object.html' %}
+
+{% block breadcrumbs %}
+  {{ block.super }}
+  {% for name, url in trail %}
+    <li class="breadcrumb-item">{% if forloop.last %}{{ name }}{% else %}<a href="{{ url }}" data-plan-parent>{{ name }}</a>{% endif %}</li>
+  {% endfor %}
+{% endblock %}
+{% block head %}{{ block.super }}<link rel="stylesheet" href="{% static_with_params 'netbox_visual_explorer/explorer.css' v=explorer_version %}">{% endblock %}
+{% block content %}
+{{ graph|json_script:"ve-data" }}
+<div id="ve-app"
+     data-diagram="{% static_with_params 'netbox_visual_explorer/diagram.js' v=explorer_version %}"
+     data-viewport="{% static_with_params 'netbox_visual_explorer/viewport.js' v=explorer_version %}"
+     data-worker="{% static_with_params 'netbox_visual_explorer/layout-worker.js' v=explorer_version %}">
+  <div class="card">
+    <div class="card-body ve-tools">
+      <label>Darstellung<select class="form-select no-ts" id="ve-mode"><option value="summary">Gruppenübersicht</option><option value="devices">Geräteplan</option><option value="paths">Endgerätepfade</option></select></label>
+      <label>Gerätefokus<select id="ve-focus" class="form-select"><option value="">Alle Geräte</option></select></label>
+      <label class="form-check mb-1"><input class="form-check-input" type="checkbox" id="ve-ports"> Portdetails im Plan</label>
+      <form method="get" id="ve-filters" class="ve-filters">
+        <details class="ve-filter" name="ve-filter"><summary class="btn btn-outline-secondary">Tags{% if tag_ids %} ({{ tag_ids|length }}){% endif %}</summary>
+          <div class="card card-body">
+            {% for obj in tags %}<label><input type="checkbox" name="tag" value="{{ obj.pk }}"{% if obj.pk in tag_ids %} checked{% endif %}> {{ obj.name }}</label>{% empty %}Keine Geräte-Tags verfügbar.{% endfor %}
+            <button class="btn btn-sm btn-primary">Anwenden</button>
+          </div>
+        </details>
+        <details class="ve-filter" name="ve-filter"><summary class="btn btn-outline-secondary">Rollen ausschließen{% if excluded_roles %} ({{ excluded_roles|length }}){% endif %}</summary>
+          <div class="card card-body">
+            {% for role in roles %}<label><input type="checkbox" name="exclude_role" value="{{ role.pk }}"{% if role.pk in excluded_roles %} checked{% endif %}> {{ role.name }}</label>{% empty %}Keine Geräterollen in dieser Auswahl.{% endfor %}
+            <button class="btn btn-sm btn-primary">Anwenden</button>
+          </div>
+        </details>
+      </form>
+      <button class="btn btn-outline-primary" id="ve-export" disabled>SVG exportieren</button>
+    </div>
+    <div class="ve-workspace">
+      <section class="ve-stage" aria-label="Netzplan">
+        <div id="ve-canvas"></div>
+        <div id="ve-message" role="status">Plan wird geladen …</div>
+        <div class="ve-camera btn-group">
+          <button class="btn btn-light" id="ve-out" aria-label="Verkleinern">−</button>
+          <button class="btn btn-light" id="ve-fit">Einpassen</button>
+          <button class="btn btn-light" id="ve-in" aria-label="Vergrößern">+</button>
+        </div>
+      </section>
+      <aside class="ve-inspector"><h2 class="h3" id="ve-heading">Details</h2><div id="ve-detail">Gerät, Gruppe oder Verbindung im Plan auswählen.</div></aside>
+    </div>
+    <div class="card-footer text-secondary" id="ve-count" aria-live="polite"></div>
+  </div>
+  <section id="ve-device" class="card card-body mt-3" hidden aria-live="polite">
+    <h2 class="h3">Gerätedaten</h2><div id="ve-device-data"></div>
+  </section>
+</div>
+<noscript>Für die interaktive Darstellung bitte JavaScript aktivieren.</noscript>
+{% endblock %}
+{% block javascript %}
+  {{ block.super }}
+  <script type="module" src="{% static_with_params 'netbox_visual_explorer/explorer.js' v=explorer_version %}"
+          onerror="document.getElementById('ve-message').textContent = 'Die JavaScript-Datei für den Blockschaltplan konnte nicht geladen werden.'"></script>
+{% endblock %}
