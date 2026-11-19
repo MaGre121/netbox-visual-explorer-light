@@ -4,6 +4,7 @@ from netbox.plugins import PluginConfig
 class VisualExplorerConfig(PluginConfig):
     name = "netbox_visual_explorer"
     verbose_name = "Visual Explorer"
+    author = "Matthias Grebe"
     description = "Interaktive Netzpläne für Sites, Locations und Racks"
     version = "0.3.5b"
     base_url = "visual-explorer"
