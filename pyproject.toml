@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "netbox-visual-explorer"
-version = "0.3.0"
+version = "0.3.5b"
 description = "Interaktive Netzpläne für NetBox"
 readme = "README.md"
 requires-python = ">=3.12"

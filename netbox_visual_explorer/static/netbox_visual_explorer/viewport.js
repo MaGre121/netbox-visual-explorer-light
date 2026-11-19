@@ -1,3 +1,49 @@
+export function planSVG(source, ports) {
+    const svg = new DOMParser().parseFromString(source, "image/svg+xml").documentElement;
+    for (const marker of svg.querySelectorAll('text[font-family^="VETrace"]')) {
+        const ns = svg.namespaceURI;
+        const key = marker.getAttribute("font-family").match(/^VETrace-([ifr]\d+)/)?.[1];
+        const port = ports?.[key];
+        const icon = document.createElementNS(ns, port?.traceUrl ? "a" : "g");
+        const width = Number(marker.getAttribute("font-size")) || 12;
+        const anchor = marker.getAttribute("text-anchor");
+        const offset = anchor === "middle" ? width / 2 : anchor === "end" ? width : 0;
+        const x = Number(marker.getAttribute("x")) - offset;
+        const y = Number(marker.getAttribute("y")) - width * .85;
+        icon.setAttribute("transform", `translate(${x} ${y}) scale(${width / 24})`);
+        icon.setAttribute("class", "ve-trace-mark");
+        const title = document.createElementNS(ns, "title");
+        title.textContent = "Vollständiger Kabeltrace";
+        if (port?.traceUrl) {
+            const url = new URL(port.traceUrl, location.href).href;
+            icon.setAttribute("href", url);
+            icon.setAttribute("target", "_blank");
+            icon.setAttribute("rel", "noopener");
+            title.textContent = "Kabeltrace für " + port.name + " öffnen";
+            icon.setAttribute("aria-label", title.textContent);
+            const hit = document.createElementNS(ns, "rect");
+            hit.setAttribute("width", "24");
+            hit.setAttribute("height", "24");
+            hit.setAttribute("fill", "transparent");
+            icon.append(hit);
+        }
+        const path = document.createElementNS(ns, "path");
+        // NetBox uses the transit-connection-variant motif for its Trace action.
+        path.setAttribute("d", "M17 4H6a3 3 0 0 0-3 3v2a3 3 0 0 0 3 3h12a3 3 0 0 1 3 3v2a3 3 0 0 1-3 3H7 M21 4a2 2 0 1 1-4 0 2 2 0 1 1 4 0 M7 20a2 2 0 1 1-4 0 2 2 0 1 1 4 0");
+        path.setAttribute("fill", "none");
+        path.setAttribute("stroke", "#087c76");
+        path.setAttribute("stroke-width", "2");
+        const joint = document.createElementNS(ns, "circle");
+        joint.setAttribute("cx", "12");
+        joint.setAttribute("cy", "12");
+        joint.setAttribute("r", "3");
+        joint.setAttribute("fill", "#087c76");
+        icon.append(title, path, joint);
+        marker.replaceWith(icon);
+    }
+    return svg;
+}
+
 export function camera(svg, select, open) {
     const bounds = svg.getAttribute("viewBox").split(/\s+/).map(Number);
     let view = [...bounds];
@@ -10,6 +56,8 @@ export function camera(svg, select, open) {
     }
     const point = e => new DOMPoint(e.clientX,e.clientY).matrixTransform(svg.getScreenCTM().inverse());
     svg.addEventListener("wheel", e => {
+        const canvas = svg.parentElement;
+        if (canvas.classList.contains("ve-scroll-plan") && canvas.scrollHeight > canvas.clientHeight && !e.ctrlKey) return;
         e.preventDefault();
         const p = point(e);
         zoom(e.deltaY > 0 ? 1.18 : 1/1.18, p.x, p.y);
@@ -18,11 +66,12 @@ export function camera(svg, select, open) {
     let start;
     let lastSelected;
     svg.addEventListener("dblclick", e => {
+        if (e.target.closest("a[href]")) return;
         const item = target(e.target);
         if (item && item === lastSelected) open(item);
     });
     svg.addEventListener("pointerdown", e => {
-        if (e.button !== 0 || !e.isPrimary) return;
+        if (e.button !== 0 || !e.isPrimary || e.target.closest("a[href]")) return;
         start = {x:e.clientX, y:e.clientY, element:target(e.target), view:[...view],
             scale:svg.getScreenCTM().a, moved:false};
         (start.element || svg).setPointerCapture(e.pointerId);
@@ -43,6 +92,7 @@ export function camera(svg, select, open) {
     });
     svg.addEventListener("pointercancel", () => { start = null; });
     svg.addEventListener("keydown", e => {
+        if (e.target.closest("a[href]")) return;
         const element = target(e.target);
         if (element && ["Enter"," "].includes(e.key)) { e.preventDefault(); if (e.key === "Enter") open(element); else select(element); }
     });

@@ -1,3 +1,5 @@
+from urllib.parse import urlencode
+
 from django.contrib.auth.decorators import login_required, permission_required
 from django.contrib.contenttypes.models import ContentType
 from django.db.models import Q
@@ -13,7 +15,7 @@ from netbox.views.generic import ObjectView
 from utilities.views import ViewTab, register_model_view
 
 from . import config
-from .topology import build_topology, plan_url
+from .topology import build_topology, device_plan_members, plan_url
 
 
 def object_id(value):
@@ -39,6 +41,12 @@ class PlanView(ObjectView):
     tab = ViewTab(label="Blockschaltplan", permission="dcim.view_device", weight=800)
     http_method_names = ["get", "head", "options"]
 
+    def get(self, request, **kwargs):
+        if request.GET.get("preview") == "1":
+            instance = self.get_object(**kwargs)
+            return JsonResponse(self.get_extra_context(request, instance)["graph"])
+        return super().get(request, **kwargs)
+
     def get_extra_context(self, request, instance):
         user = request.user
         site = instance if isinstance(instance, Site) else get_object_or_404(
@@ -49,7 +57,10 @@ class PlanView(ObjectView):
         devices = Device.objects.restrict(user, "view").filter(site=site)
         location = instance if isinstance(instance, Location) else None
         rack = instance if isinstance(instance, Rack) else None
-        if rack:
+        device = instance if isinstance(instance, Device) else None
+        if device:
+            devices = devices.filter(Q(pk=device.pk) | Q(pk__in=device_plan_members(user, device)))
+        elif rack:
             devices = devices.filter(rack=rack)
         elif location:
             descendants = {loc.pk for loc in locations.values() if loc.tree_id == location.tree_id
@@ -64,28 +75,29 @@ class PlanView(ObjectView):
         roles = DeviceRole.objects.restrict(user, "view")
         excluded_roles = selected_ids(request.GET, "exclude_role", roles)
         # Keep applied exclusions available when drilling into a rack without that role.
-        role_choices = roles.filter(Q(pk__in=devices.values("role_id")) | Q(pk__in=excluded_roles)).order_by("name", "pk")
+        role_ids = devices.values("role_id")
         if tag_ids:
             devices = devices.filter(tags__in=tag_ids).distinct()
 
-        lineage = []
-        parent = locations.get(rack.location_id) if rack else location
-        while parent:
-            lineage.append(parent)
-            parent = locations.get(parent.parent_id)
-        trail = [site, *reversed(lineage)]
-        if rack:
-            trail.append(rack)
+        if device:
+            rack = racks.get(device.rack_id)
+            location = locations.get(device.location_id)
         filters = [("tag", t) for t in sorted(tag_ids)]
         filters.extend(("exclude_role", pk) for pk in sorted(excluded_roles))
-        if request.GET.get("ports") == "1":
-            filters.append(("ports", "1"))
+        if request.GET.get("ports") in ("0", "1"):
+            filters.append(("ports", request.GET["ports"]))
+        query = "?" + urlencode(filters) if filters else ""
+        graph = build_topology(user, devices, locations, racks, site, location, rack, device)
+        if device:
+            role_ids = {n["roleId"] for n in graph["nodes"] if n["roleId"]}
+        role_choices = roles.filter(Q(pk__in=role_ids) | Q(pk__in=excluded_roles)).order_by("name", "pk")
         return {
             "explorer_version": config.version,
-            "trail": [(obj.name, plan_url(obj, filters)) for obj in trail],
+            "device_focus": device.pk if device else None,
+            "trail": [(name, url + query) for name, url in graph["trail"]],
             "roles": role_choices, "excluded_roles": excluded_roles,
             "tags": tags, "tag_ids": tag_ids,
-            "graph": build_topology(user, devices, locations, racks, site, location, rack),
+            "graph": graph,
         }
 
 
@@ -102,6 +114,11 @@ class LocationPlanView(PlanView):
 @register_model_view(Rack, "blockschaltplan")
 class RackPlanView(PlanView):
     queryset = Rack.objects.all()
+
+
+@register_model_view(Device, "blockschaltplan")
+class DevicePlanView(PlanView):
+    queryset = Device.objects.all()
 
 
 @login_required

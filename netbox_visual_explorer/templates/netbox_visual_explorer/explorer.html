@@ -3,20 +3,21 @@
 {% block breadcrumbs %}
   {{ block.super }}
   {% for name, url in trail %}
-    <li class="breadcrumb-item">{% if forloop.last %}{{ name }}{% else %}<a href="{{ url }}" data-plan-parent>{{ name }}</a>{% endif %}</li>
+    <li class="breadcrumb-item"><a href="{{ url }}" data-plan-parent{% if forloop.last %} aria-current="page"{% endif %}>{{ name }}</a></li>
   {% endfor %}
 {% endblock %}
 {% block head %}{{ block.super }}<link rel="stylesheet" href="{% static_with_params 'netbox_visual_explorer/explorer.css' v=explorer_version %}">{% endblock %}
 {% block content %}
 {{ graph|json_script:"ve-data" }}
 <div id="ve-app"
+     {% if device_focus %}data-device="{{ device_focus }}"{% endif %}
      data-diagram="{% static_with_params 'netbox_visual_explorer/diagram.js' v=explorer_version %}"
      data-viewport="{% static_with_params 'netbox_visual_explorer/viewport.js' v=explorer_version %}"
      data-worker="{% static_with_params 'netbox_visual_explorer/layout-worker.js' v=explorer_version %}">
   <div class="card">
     <div class="card-body ve-tools">
-      <label>Darstellung<select class="form-select no-ts" id="ve-mode"><option value="summary">Gruppenübersicht</option><option value="devices">Geräteplan</option><option value="paths">Endgerätepfade</option></select></label>
-      <label>Gerätefokus<select id="ve-focus" class="form-select"><option value="">Alle Geräte</option></select></label>
+      <label>Darstellung<select class="form-select no-ts" id="ve-mode">{% if not device_focus %}<option value="summary">Gruppenübersicht</option>{% endif %}<option value="devices">Geräteplan</option><option value="paths">Endgerätepfade</option></select></label>
+      <label {% if device_focus %}hidden{% endif %}>Gerätefokus<select id="ve-focus" class="form-select"><option value="">Alle Geräte</option></select></label>
       <label class="form-check mb-1"><input class="form-check-input" type="checkbox" id="ve-ports"> Portdetails im Plan</label>
       <form method="get" id="ve-filters" class="ve-filters">
         <details class="ve-filter" name="ve-filter"><summary class="btn btn-outline-secondary">Tags{% if tag_ids %} ({{ tag_ids|length }}){% endif %}</summary>

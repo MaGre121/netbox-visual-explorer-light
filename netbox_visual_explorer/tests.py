@@ -68,8 +68,21 @@ class ExplorerTest(TestCase):
         graph = self.graph(self.building)
         self.assertEqual(len(graph["nodes"]), 3)
         self.assertEqual(len(graph["cables"]), 2)
+        self.assertTrue(all(port.get("traceable") for port in graph["ports"].values()))
+        for key, port in graph["ports"].items():
+            model = {"i": "interface", "f": "frontport", "r": "rearport"}[key[0]]
+            url = port["traceUrl"]
+            self.assertEqual(url.split("?")[0], reverse(f"dcim:{model}_trace", args=[int(key[1:])]))
+            response = self.client.get(url)
+            self.assertEqual(response.status_code, 200)
+            self.assertTrue(response.context["path"].is_complete)
+            if model != "interface":
+                self.assertEqual(response.context["path"].pk, int(response.wsgi_request.GET["cablepath_id"]))
         self.assertEqual(len(graph["paths"]), 1)
         self.assertEqual(set(graph["paths"][0]["steps"]), {c["id"] for c in graph["cables"]})
+        for cable in graph["cables"]:
+            self.assertEqual(self.client.get(cable["traceUrl"], {"cablepath_id": graph["paths"][0]["pathId"]}).status_code, 200)
+        self.assertNotIn("lo", [port["name"] for port in graph["ports"].values()])
         self.assertEqual([n["name"] for n in self.graph(tag=self.tag.pk)["nodes"]], ["Links"])
 
     def test_hidden_termination_and_scope(self):
@@ -78,7 +91,9 @@ class ExplorerTest(TestCase):
         self.assertEqual(len(graph["cables"]), 1)
         self.assertEqual(graph["paths"], [])
         self.assertNotIn("Rückseite", str(graph))
+        self.assertFalse(any(port.get("traceable") or port.get("traceUrl") for port in graph["ports"].values()))
         other = Site.objects.create(name="Privat", slug="privat")
+        self.assertEqual(self.client.get(plan_url(other), {"preview": "1"}).status_code, 404)
         self.assertEqual(self.client.get(self.url, {"site": other.pk}).status_code, 404)
         self.assertEqual(self.client.get(self.url, {"site": self.site.pk, "rack": self.rack.pk}).status_code, 404)
 
@@ -102,6 +117,7 @@ class ExplorerTest(TestCase):
                 self.assertContains(response, f"netbox_visual_explorer/{asset}?v={config.version}")
             self.assertEqual(response.context["trail"], [(p.name, plan_url(p)) for p in chain[:index + 1]])
             graph = response.context["graph"]
+            self.assertEqual(self.client.get(plan_url(obj), {"preview": "1"}).json(), graph)
             if obj != self.rack:
                 child = graph["nodes"][0]["summary"]
                 self.assertEqual(graph["groups"][child]["url"], plan_url(chain[index + 1]))
@@ -109,6 +125,36 @@ class ExplorerTest(TestCase):
                 self.assertFalse(graph["hasChildren"])
         old_link = {"site": self.site.pk, "location": self.building.pk, "rack": self.rack.pk, "mode": "paths"}
         self.assertRedirects(self.client.get(self.url, old_link), plan_url(self.rack, {"mode": "paths"}))
+
+    def test_device_tab_and_pass_through_trace_in_separate_rack(self):
+        self.client.force_login(self.user)
+        panel = Device.objects.get(name="Patchfeld")
+        separate = Rack.objects.create(site=self.site, name="Verteiler")
+        Device.objects.filter(pk=panel.pk).update(rack=separate)
+        self.assertContains(self.client.get(panel.get_absolute_url()), plan_url(panel))
+        response = self.client.get(plan_url(panel))
+        self.assertContains(response, f'data-device="{panel.pk}"')
+        ports = response.context["graph"]["ports"].values()
+        self.assertEqual({p["kind"] for p in ports if p.get("traceable")}, {"Frontport", "Rearport", "Interface"})
+        self.assertTrue(all(p.get("traceable") for p in self.graph(separate)["ports"].values()))
+        Interface.objects.create(device=self.device, name="extra", type="1000base-t")
+        loose = FrontPort.objects.create(device=panel, name="Unvollständig")
+        Cable(a_terminations=[Interface.objects.get(device=self.device, name="extra")], b_terminations=[loose]).save()
+        self.assertFalse(self.graph(panel)["ports"][f"f{loose.pk}"].get("traceable"))
+
+    def test_complete_device_trail(self):
+        self.client.force_login(self.user)
+        chain = [self.site, self.building, self.floor, self.rack, self.device]
+        expected = [[obj.name, plan_url(obj)] for obj in chain]
+        for rack_loc, device_loc in ((self.floor, None), (None, self.floor), (self.floor, self.building)):
+            Rack.objects.filter(pk=self.rack.pk).update(location=rack_loc)
+            Device.objects.filter(pk=self.device.pk).update(location=device_loc)
+            response = self.client.get(plan_url(self.device))
+            graph = response.context["graph"]
+            self.assertEqual(graph["trail"], expected)
+            self.assertEqual(response.context["trail"], [tuple(step) for step in expected])
+            node = next(n for n in graph["nodes"] if n["id"] == self.device.pk)
+            self.assertEqual(node["trail"], expected[:-1])
 
     def test_role_filter_choices_and_navigation(self):
         self.client.force_login(self.user)
