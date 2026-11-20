@@ -19,7 +19,7 @@ async function start() {
     const target = assets.device || params.get("focus");
     setFocus(devices.has(Number(target)) ? target : "");
     mode.value = params.get("mode") || (data.hasChildren ? "summary" : "devices");
-    if (!mode.value) mode.value = assets.device ? "devices" : "summary";
+    if (!mode.value) mode.value = mode.options[0].value;
     if (focus.value && mode.value === "summary") mode.value = "devices";
     ports.checked = params.has("ports") ? params.get("ports") === "1" : Boolean(assets.device);
     let worker, scene, svg, viewport;

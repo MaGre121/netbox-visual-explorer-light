@@ -5,7 +5,7 @@ from django.contrib.contenttypes.models import ContentType
 from django.db.models import Prefetch
 from django.urls import reverse
 
-from dcim.models import Cable, CablePath, CableTermination, Device, DeviceRole, FrontPort, Interface, RearPort
+from dcim.models import Cable, CablePath, CableTermination, Device, DeviceRole, FrontPort, Interface, PortMapping, RearPort
 from ipam.models import IPAddress, VLAN
 
 
@@ -105,6 +105,8 @@ def network_cables(user, ids):
                 Prefetch("ip_addresses", queryset=IPAddress.objects.restrict(user, "view")
                          .only("address", "assigned_object_id", "assigned_object_type_id"), to_attr="visible_ips"),
             )
+        else:
+            fields.append("positions")
         ct_id = ContentType.objects.get_for_model(model).pk
         for port in qs.only(*fields).order_by("pk"):
             key = f"{prefix}{port.pk}"
@@ -114,6 +116,8 @@ def network_cables(user, ids):
                             tagged=sorted(v.vid for v in port.visible_vlans),
                             allTagged=port.mode == "tagged-all", mgmt=port.mgmt_only,
                             ips=[str(ip.address) for ip in port.visible_ips])
+            elif port.positions > 1:
+                info["positions"] = port.positions
             ports[key] = info
             sides[port.cable_id][port.cable_end].append(key)
             visible_path_nodes[f"{ct_id}:{port.pk}"] = key
@@ -200,6 +204,14 @@ def build_topology(user, devices, locations, racks, site, location=None, rack=No
         nodes = [node for node in nodes if node["id"] in members]
         group_keys = {node[k] for node in nodes for k in ("group", "summary")}
         groups = {k: group for k, group in groups.items() if k in group_keys}
+    # PortMapping is private in NetBox. Both ends must already be visible in this plan.
+    front_ids = [int(k[1:]) for k in ports if k.startswith("f")]
+    rear_ids = [int(k[1:]) for k in ports if k.startswith("r")]
+    mappings = PortMapping.objects.filter(front_port_id__in=front_ids, rear_port_id__in=rear_ids)
+    for rear, front, rear_pos, front_pos in mappings.order_by("rear_port_position").values_list(
+        "rear_port_id", "front_port_id", "rear_port_position", "front_port_position"
+    ):
+        ports[f"r{rear}"].setdefault("frontMappings", []).append([f"f{front}", rear_pos, front_pos])
     trail = plan_trail([site, *location_lineage(locations, location, rack), rack, device])
     return {"title": " / ".join(name for name, _ in trail), "trail": trail,
             "hasChildren": any(n["summary"] in groups for n in nodes),

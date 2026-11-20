@@ -5,8 +5,11 @@ class VisualExplorerConfig(PluginConfig):
     name = "netbox_visual_explorer"
     verbose_name = "Visual Explorer"
     author = "Matthias Grebe"
-    description = "Interaktive Netzpläne für Sites, Locations und Racks"
-    version = "0.3.5b"
+    description = (
+        "Interaktive Netzpläne für Sites, Locations, Racks und Geräte. "
+        "Apache-2.0 · <https://github.com/MaGre121/netbox-visual-explorer-light>"
+    )
+    version = "0.3.6b"
     base_url = "visual-explorer"
     min_version = "4.5.0"
 

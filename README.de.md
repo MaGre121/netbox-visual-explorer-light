@@ -4,15 +4,15 @@
 
 Mit dem Visual Explorer lässt sich die in NetBox dokumentierte Verkabelung direkt an einer Site, einer Location, einem Rack oder einem Gerät erkunden. Die Gruppierung nach Location und Rack und die Anordnung nach Rollen-Level stammen aus dem ursprünglichen Draw.io-Blockschaltplan. Der Reiter **Blockschaltplan** zeigt Geräte und ihre Verbindungen einschließlich der Front- und Rear-Ports an Patchfeldern. Du kannst einem Kabel bis zum Anschluss folgen, einen vollständigen Pfad verfolgen und den aktuellen Plan als SVG exportieren.
 
-**Autor** Matthias Grebe · **Plugin-Version** `0.3.5b` · **Voraussetzungen** NetBox ab 4.5.0 und Python ab 3.12.
+**Autor** Matthias Grebe · **Plugin-Version** `0.3.6b` · **Voraussetzungen** NetBox ab 4.5.0 und Python ab 3.12.
 
 ## Einen Plan erkunden
 
-Öffne **Blockschaltplan** auf der NetBox-Detailseite. Ein Doppelklick auf eine Location oder ein Rack führt eine Ebene tiefer. Ein Doppelklick auf ein Gerät öffnet in jeder Darstellung dessen eigenen Plan, mit dem Gerät links und den direkten Nachbarn rechts. Über den Standortpfad gelangst du wieder nach oben. Klicke dazu auf die gewünschte Site, Location oder das Rack. Vorhandene Explorer-Lesezeichen mit Site-, Location- oder Rack-Auswahl führen ebenfalls zum entsprechenden Reiter. Ohne Auswahl öffnet sich die Site-Liste.
+Öffne **Blockschaltplan** auf der NetBox-Detailseite. Ein Doppelklick auf eine Location oder ein Rack führt eine Ebene tiefer. Ein Doppelklick auf ein Gerät öffnet in jeder Darstellung dessen eigenen Plan, mit seinen direkten Kabelnachbarn. Gegenstellen an Rearports stehen links, Gegenstellen an Frontports und Interfaces rechts. Am ausgewählten Patchfeld stehen die laut NetBox zugeordneten Rear- und Frontports in derselben Zeile. Über den Standortpfad gelangst du wieder nach oben. Klicke dazu auf die gewünschte Site, Location oder das Rack. Vorhandene Explorer-Lesezeichen mit Site-, Location- oder Rack-Auswahl führen ebenfalls zum entsprechenden Reiter. Ohne Auswahl öffnet sich die Site-Liste.
 
 | Darstellung | Inhalt |
 | --- | --- |
-| **Gruppenübersicht** | Gruppiert Geräte nach Location oder Rack und bündelt Kabel zwischen den Gruppen. Ein Klick auf eine Gruppe zeigt die Vorschau ihres Plans. Sites und Locations mit untergeordneten Gruppen starten in dieser Ansicht. |
+| **Gruppenübersicht** | Gruppiert Geräte nach Location oder Rack und bündelt Kabel zwischen den Gruppen. Ein Klick auf eine Gruppe zeigt die Vorschau ihres Plans. Diese Ansicht steht für Sites und Locations zur Verfügung. Bei untergeordneten Gruppen öffnet sie sich automatisch. |
 | **Geräteplan** | Zeigt direkte Kabelnachbarn, Patchfelder und Geräte ohne Kabel. Rahmen kennzeichnen Racks und Locations. Die Geräterolle bestimmt die Farbe, das optionale Rollen-Custom-Field `level` beeinflusst die Anordnung. Racks öffnen sich in dieser Ansicht. |
 | **Endgerätepfade** | Verbindet die Interfaces an beiden Enden eines vollständigen, eindeutigen NetBox-Kabelpfads. Die Detailspalte zeigt die durchlaufenen Kabel in ihrer Reihenfolge. |
 
@@ -57,11 +57,11 @@ Lade das Wheel für deine Version von [GitHub Releases](https://github.com/MaGre
 python -m pip wheel --no-deps --wheel-dir dist .
 ```
 
-Kopiere `dist/netbox_visual_explorer-0.3.5b0-py3-none-any.whl` in den Ordner `plugins/` deines netbox-docker-Build-Kontexts. Python normalisiert die Version `0.3.5b` im Wheel-Dateinamen zu `0.3.5b0`. Ergänze in **`Dockerfile-Plugins`** vor `collectstatic`:
+Kopiere `dist/netbox_visual_explorer-0.3.6b0-py3-none-any.whl` in den Ordner `plugins/` deines netbox-docker-Build-Kontexts. Python normalisiert die Version `0.3.6b` im Wheel-Dateinamen zu `0.3.6b0`. Ergänze in **`Dockerfile-Plugins`** vor `collectstatic`:
 
 ```dockerfile
-COPY plugins/netbox_visual_explorer-0.3.5b0-py3-none-any.whl /tmp/
-RUN /usr/local/bin/uv pip install --python /opt/netbox/venv/bin/python --no-deps /tmp/netbox_visual_explorer-0.3.5b0-py3-none-any.whl
+COPY plugins/netbox_visual_explorer-0.3.6b0-py3-none-any.whl /tmp/
+RUN /usr/local/bin/uv pip install --python /opt/netbox/venv/bin/python --no-deps /tmp/netbox_visual_explorer-0.3.6b0-py3-none-any.whl
 ```
 
 ### Plugin aktivieren und Image neu bauen
@@ -91,7 +91,7 @@ docker compose up -d netbox netbox-worker
 
 ## Installation im NetBox-venv
 
-Aktiviere die virtuelle Umgebung von NetBox und installiere das Wheel mit `python -m pip install /pfad/zum/netbox_visual_explorer-0.3.5b0-py3-none-any.whl`. Ergänze `"netbox_visual_explorer"` in `PLUGINS`, führe im Verzeichnis der `manage.py` den Befehl `python manage.py collectstatic --no-input` aus und starte die NetBox-Dienste neu. Das Plugin hat keine eigenen Datenbanktabellen. In einer NetBox-Testumgebung lassen sich die Integrationstests mit `python manage.py test netbox_visual_explorer` ausführen.
+Aktiviere die virtuelle Umgebung von NetBox und installiere das Wheel mit `python -m pip install /pfad/zum/netbox_visual_explorer-0.3.6b0-py3-none-any.whl`. Ergänze `"netbox_visual_explorer"` in `PLUGINS`, führe im Verzeichnis der `manage.py` den Befehl `python manage.py collectstatic --no-input` aus und starte die NetBox-Dienste neu. Das Plugin hat keine eigenen Datenbanktabellen. In einer NetBox-Testumgebung lassen sich die Integrationstests mit `python manage.py test netbox_visual_explorer` ausführen.
 
 ## Datenumfang, Rechte und Lizenzen
 

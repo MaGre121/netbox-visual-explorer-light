@@ -4,15 +4,15 @@
 
 Explore the cabling documented in NetBox directly from a site, location, rack or device. Location and rack groups and the role-based layout follow the original Draw.io block diagram. The **Blockschaltplan** tab shows how devices connect, including front and rear ports on patch panels. You can follow a cable to its termination, trace an end-to-end path and export the current diagram as SVG. The plugin interface is in German.
 
-**Author** Matthias Grebe · **Plugin version** `0.3.5b` · **Requires** NetBox 4.5.0 or later and Python 3.12 or later.
+**Author** Matthias Grebe · **Plugin version** `0.3.6b` · **Requires** NetBox 4.5.0 or later and Python 3.12 or later.
 
 ## Explore a plan
 
-Open **Blockschaltplan** on a NetBox object. Double-click a location or rack to go one level deeper. Double-click a device in any view to open its own plan, with the device on the left and its direct neighbors on the right. To go back up, click a site, location or rack in the location path. Existing explorer bookmarks with a site, location or rack still open the corresponding tab. A bookmark without a selection opens the site list.
+Open **Blockschaltplan** on a NetBox object. Double-click a location or rack to go one level deeper. Double-click a device in any view to open its own plan, with its direct cable neighbors. Rear-port neighbors appear on the left, front-port and interface neighbors on the right. Each documented rear-to-front mapping shares a row on the selected patch panel. To go back up, click a site, location or rack in the location path. Existing explorer bookmarks with a site, location or rack still open the corresponding tab. A bookmark without a selection opens the site list.
 
 | View | What it shows |
 | --- | --- |
-| **Gruppenübersicht** (group overview) | Groups devices by location or rack and bundles cables between groups. Select a group for a preview of its plan. Sites and locations with child groups open here. |
+| **Gruppenübersicht** (group overview) | Groups devices by location or rack and bundles cables between groups. Select a group for a preview of its plan. Available on sites and locations. Those with child groups open here. |
 | **Geräteplan** (device plan) | Shows direct cable neighbors, patch panels and devices without cables. Frames identify racks and locations. Device roles supply the colors, and the optional role custom field `level` influences the layout. Racks open in this view. |
 | **Endgerätepfade** (endpoint paths) | Connects the interfaces at both ends of a complete, unambiguous NetBox path. The details pane lists the cables in traversal order. |
 
@@ -57,11 +57,11 @@ Download the wheel for your version from [GitHub Releases](https://github.com/Ma
 python -m pip wheel --no-deps --wheel-dir dist .
 ```
 
-Copy `dist/netbox_visual_explorer-0.3.5b0-py3-none-any.whl` into the `plugins/` directory of your netbox-docker build context. Python normalizes the version `0.3.5b` to `0.3.5b0` in the wheel filename. Add these lines to **`Dockerfile-Plugins`** before `collectstatic`:
+Copy `dist/netbox_visual_explorer-0.3.6b0-py3-none-any.whl` into the `plugins/` directory of your netbox-docker build context. Python normalizes the version `0.3.6b` to `0.3.6b0` in the wheel filename. Add these lines to **`Dockerfile-Plugins`** before `collectstatic`:
 
 ```dockerfile
-COPY plugins/netbox_visual_explorer-0.3.5b0-py3-none-any.whl /tmp/
-RUN /usr/local/bin/uv pip install --python /opt/netbox/venv/bin/python --no-deps /tmp/netbox_visual_explorer-0.3.5b0-py3-none-any.whl
+COPY plugins/netbox_visual_explorer-0.3.6b0-py3-none-any.whl /tmp/
+RUN /usr/local/bin/uv pip install --python /opt/netbox/venv/bin/python --no-deps /tmp/netbox_visual_explorer-0.3.6b0-py3-none-any.whl
 ```
 
 ### Activate the plugin and rebuild
@@ -91,7 +91,7 @@ Open a site or device in NetBox and select **Blockschaltplan** to verify the ins
 
 ## Install in a NetBox virtual environment
 
-Activate the NetBox virtual environment and install the wheel with `python -m pip install /path/to/netbox_visual_explorer-0.3.5b0-py3-none-any.whl`. Add `"netbox_visual_explorer"` to `PLUGINS`, run `python manage.py collectstatic --no-input` from the directory containing `manage.py`, and restart the NetBox services. The plugin has no database tables of its own. To run its integration tests in a NetBox test environment, use `python manage.py test netbox_visual_explorer`.
+Activate the NetBox virtual environment and install the wheel with `python -m pip install /path/to/netbox_visual_explorer-0.3.6b0-py3-none-any.whl`. Add `"netbox_visual_explorer"` to `PLUGINS`, run `python manage.py collectstatic --no-input` from the directory containing `manage.py`, and restart the NetBox services. The plugin has no database tables of its own. To run its integration tests in a NetBox test environment, use `python manage.py test netbox_visual_explorer`.
 
 ## Data, permissions and licenses
 

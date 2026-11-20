@@ -94,6 +94,7 @@ class PlanView(ObjectView):
         return {
             "explorer_version": config.version,
             "device_focus": device.pk if device else None,
+            "show_summary": isinstance(instance, (Site, Location)),
             "trail": [(name, url + query) for name, url in graph["trail"]],
             "roles": role_choices, "excluded_roles": excluded_roles,
             "tags": tags, "tag_ids": tag_ids,

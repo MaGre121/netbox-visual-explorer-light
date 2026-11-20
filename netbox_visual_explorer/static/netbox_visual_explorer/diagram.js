@@ -78,8 +78,9 @@ export function connectionRows(records, ports, selectedId) {
 // Reserve space in Graphviz for the vector trace symbol inserted in the SVG.
 const traceMark = (port, key) => port.traceable ? ` <FONT FACE="VETrace-${key}" POINT-SIZE="12">M</FONT>` : "";
 
-function portTable(port, key, details) {
-    const rows = [[port.kind === "Interface" ? "Port" : port.kind, portName(port)]];
+function portTable(port, key, details, position) {
+    const label = position && port.positions > 1 ? portName(port) + " · Pos. " + position : portName(port);
+    const rows = [[port.kind === "Interface" ? "Port" : port.kind, label]];
     if (details) {
         const vlans = portVlans(port);
         if (vlans.length) rows.push(["VLAN", vlans.join(" · ")]);
@@ -89,57 +90,105 @@ function portTable(port, key, details) {
         escape(label) + '</FONT></TD><TD ALIGN="LEFT">' + escape(value) + (i === 0 ? traceMark(port, key) : "") + '</TD></TR>').join("");
 }
 
+function socketCell(socket, content) {
+    const anchor = socket ? ' PORT="' + socket + '"' : "";
+    return '<TD' + anchor + ' BORDER="1" COLOR="#c9d5dc"><TABLE BORDER="0" CELLBORDER="0" ' +
+        'CELLPADDING="2" CELLSPACING="0">' + content + '</TABLE></TD>';
+}
+
+// One row per documented mapping. A missing or filtered partner leaves its cell empty.
+function panelRows(ports, local, details) {
+    const ordered = [...local].sort((a, b) => byName.compare(ports[a].name, ports[b].name));
+    const used = new Set();
+    function cell(key, position) {
+        if (!key) return '<TD></TD>';
+        const anchor = used.has(key) ? null : key;
+        used.add(key);
+        return socketCell(anchor, portTable(ports[key], key, details, position));
+    }
+    let html = "";
+    for (const rear of ordered.filter(k => k.startsWith("r"))) {
+        const pairs = (ports[rear].frontMappings || []).filter(([front]) => local.has(front));
+        if (!pairs.length) html += '<TR>' + cell(rear) + cell(null) + '</TR>';
+        for (const [front, rearPos, frontPos] of pairs) {
+            html += '<TR>' + cell(rear, rearPos) + cell(front, frontPos) + '</TR>';
+        }
+    }
+    for (const key of ordered) {
+        if (!used.has(key)) html += '<TR>' + cell(null) + cell(key) + '</TR>';
+    }
+    return html;
+}
+
 function neighborDiagram(data, devices, focus, details, graph) {
     const nodes = new Map(), edges = [];
-    function addDevice(id) {
-        const key = "d" + id;
-        if (!nodes.has(key)) nodes.set(key, {key, members:[devices.get(id)], records:new Set(), sockets:new Map()});
+    function addDevice(id, side) {
+        let key = "d" + id;
+        // A peer cabled to both faces is drawn on both sides of the selected device.
+        if (id !== focus && nodes.has(key) && nodes.get(key).side !== side) key += "-" + side;
+        if (!nodes.has(key)) nodes.set(key, {key, side, members:[devices.get(id)], records:new Set(), sockets:new Map()});
         return nodes.get(key);
     }
     graph.graphAttributes.ranksep = 1.6;
-    const start = addDevice(focus);
-    const bundles = new Map();
+    const start = addDevice(focus, "center");
+    const local = new Set(), bundles = new Map();
     for (const {record, from, to} of connectionRows(data.cables, data.ports, focus)) {
         start.records.add(record);
-        for (const key of to) {
-            const peer = addDevice(data.ports[key].device);
-            peer.records.add(record);
-            const bundleKey = details ? peer.key + "-" + record.id : peer.key;
-            if (!bundles.has(bundleKey)) bundles.set(bundleKey, {peer, records:new Set(), from:new Set(), to:new Set()});
-            const bundle = bundles.get(bundleKey);
-            bundle.records.add(record);
-            for (const local of from) bundle.from.add(local);
-            bundle.to.add(key);
+        for (const source of from) {
+            local.add(source);
+            const side = source.startsWith("r") ? "left" : "right";
+            for (const target of to) {
+                const peer = addDevice(data.ports[target].device, side);
+                peer.records.add(record);
+                if (peer === start) local.add(target);
+                const key = [side, peer.key, details ? record.id : ""].join("-");
+                if (!bundles.has(key)) bundles.set(key, {peer, side, records:new Set(), from:new Set(), to:new Set()});
+                const bundle = bundles.get(key);
+                bundle.records.add(record);
+                bundle.from.add(source);
+                bundle.to.add(target);
+            }
         }
     }
-    for (const bundle of bundles.values()) {
-        const peer = bundle.peer;
-        const records = [...bundle.records];
-        const edge = {tail:start.key, head:peer.key};
+    const panel = [...local].some(k => k.startsWith("r"));
+    function attachment(keys, direction) {
+        return keys.size === 1 ? [...keys][0] + ":" + direction : direction;
+    }
+    for (const {peer, side, records:recordSet, from, to} of bundles.values()) {
+        const records = [...recordSet];
+        const left = side === "left";
+        const edge = left ? {tail:peer.key, head:start.key} : {tail:start.key, head:peer.key};
         const source = "src" + edges.length, target = "dst" + edges.length;
-        start.sockets.set(source, [...bundle.from]);
-        peer.sockets.set(target, [...bundle.to]);
+        if (!panel) start.sockets.set(source, [...from]);
+        if (!panel || peer !== start) peer.sockets.set(target, [...to]);
+        const localPort = panel ? attachment(from, left ? "w" : "e") : source + ":e";
+        const peerPort = panel && peer === start ? attachment(to, [...to][0].startsWith("r") ? "w" : "e") :
+            target + (left || peer === start ? ":e" : ":w");
         const label = records.length > 1 ? records.length + " Kabel" : details ? records[0].name.replaceAll("\\", "\\\\") : "";
-        graph.edges.push({...edge, attributes:{id:"ve-edge-" + edges.length, tailport:source + ":e",
-            headport:target + (peer === start ? ":e" : ":w"), label, tooltip:label || records[0].name,
+        graph.edges.push({...edge, attributes:{id:"ve-edge-" + edges.length, tailport:left ? peerPort : localPort,
+            headport:left ? localPort : peerPort, label, tooltip:label || records[0].name,
             color:color(records.length === 1 && records[0].color, "#627c8a"), penwidth:records.length > 1 ? 2.5 : 1.5}});
         edges.push({...edge, records});
     }
-    const peers = {name:"neighbors", graphAttributes:{rank:"same"}, nodes:[]};
+    const ranks = {left:[], right:[]};
     for (const node of nodes.values()) {
         const device = node.members[0];
+        const paired = panel && node === start;
         let html = '<TABLE BORDER="1" COLOR="#99aeba" CELLBORDER="0" CELLSPACING="0" CELLPADDING="6">' +
-            '<TR><TD BGCOLOR="#e6eff3"><B>' + escape(device.name) + '</B></TD></TR>';
+            '<TR><TD COLSPAN="' + (paired ? 2 : 1) + '" BGCOLOR="#e6eff3"><B>' + escape(device.name) + '</B></TD></TR>';
+        if (paired) html += panelRows(data.ports, local, details);
         for (const [socket, keys] of node.sockets) {
-            html += '<TR><TD PORT="' + socket + '" BORDER="1" COLOR="#c9d5dc"><TABLE BORDER="0" CELLBORDER="0" ' +
-                'CELLPADDING="2" CELLSPACING="0">' + keys.map(k => portTable(data.ports[k], k, details)).join("") + '</TABLE></TD></TR>';
+            html += '<TR>' + socketCell(socket, keys.map(k => portTable(data.ports[k], k, details)).join("")) + '</TR>';
         }
         const entry = {name:node.key, attributes:{id:"ve-node-" + node.key, shape:"plain", style:"filled",
             label:{html:html + '</TABLE>'}}};
-        (node === start ? graph.nodes : peers.nodes).push(entry);
+        (node === start ? graph.nodes : ranks[node.side]).push(entry);
     }
-    if (peers.nodes.length) graph.subgraphs.push(peers);
-    return {graph, nodes, edges, count:nodes.size, records:start.records.size};
+    for (const [side, peers] of Object.entries(ranks)) {
+        if (peers.length) graph.subgraphs.push({name:side, graphAttributes:{rank:"same"}, nodes:peers});
+    }
+    const count = new Set([...nodes.values()].map(node => node.members[0].id)).size;
+    return {graph, nodes, edges, count, records:start.records.size};
 }
 
 export function diagram(data, mode, focus, showPorts) {

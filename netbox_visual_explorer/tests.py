@@ -78,6 +78,9 @@ class ExplorerTest(TestCase):
             self.assertTrue(response.context["path"].is_complete)
             if model != "interface":
                 self.assertEqual(response.context["path"].pk, int(response.wsgi_request.GET["cablepath_id"]))
+        rear = next(p for p in graph["ports"].values() if p["kind"] == "Rearport")
+        front = next(key for key, p in graph["ports"].items() if p["kind"] == "Frontport")
+        self.assertEqual(rear["frontMappings"], [[front, 1, 1]])
         self.assertEqual(len(graph["paths"]), 1)
         self.assertEqual(set(graph["paths"][0]["steps"]), {c["id"] for c in graph["cables"]})
         for cable in graph["cables"]:
@@ -91,6 +94,7 @@ class ExplorerTest(TestCase):
         self.assertEqual(len(graph["cables"]), 1)
         self.assertEqual(graph["paths"], [])
         self.assertNotIn("Rückseite", str(graph))
+        self.assertNotIn("frontMappings", str(graph["ports"]))
         self.assertFalse(any(port.get("traceable") or port.get("traceUrl") for port in graph["ports"].values()))
         other = Site.objects.create(name="Privat", slug="privat")
         self.assertEqual(self.client.get(plan_url(other), {"preview": "1"}).status_code, 404)
@@ -112,6 +116,10 @@ class ExplorerTest(TestCase):
         for index, obj in enumerate(chain):
             self.assertContains(self.client.get(obj.get_absolute_url()), plan_url(obj))
             response = self.client.get(plan_url(obj))
+            if obj == self.rack:
+                self.assertNotContains(response, '<option value="summary">')
+            else:
+                self.assertContains(response, '<option value="summary">')
             self.assertNotContains(response, 'id="ve-scope"')
             for asset in ("explorer.js", "diagram.js", "viewport.js", "layout-worker.js", "explorer.css"):
                 self.assertContains(response, f"netbox_visual_explorer/{asset}?v={config.version}")
