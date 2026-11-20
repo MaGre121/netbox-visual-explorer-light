@@ -1,6 +1,6 @@
 from django.contrib.auth import get_user_model
 from django.contrib.contenttypes.models import ContentType
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from django.urls import reverse
 
 from dcim.models import (
@@ -13,6 +13,26 @@ from ipam.models import IPAddress
 from . import config
 from .topology import plan_url
 from users.models import ObjectPermission
+
+
+@override_settings(ISOLATED_DEPLOYMENT=True, LANGUAGE_CODE="en-us")
+class PluginDetailsTest(TestCase):
+    def test_metadata_in_native_table_rows(self):
+        user = get_user_model().objects.create(username="plugin-admin", is_superuser=True)
+        self.client.force_login(user)
+        response = self.client.get(reverse("core:plugin", args=[config.name]))
+        url = "https://github.com/MaGre121/netbox-visual-explorer-light"
+        summary = "Interaktive Netzpläne für Sites, Locations, Racks und Geräte."
+        for label, value in (
+            ("URL", f'<a href="{url}">{url}</a>'),
+            ("License", "Apache-2.0"),
+            ("Summary", summary),
+            ("Description", f'<div class="rendered-markdown"><p>{summary}</p></div>'),
+        ):
+            with self.subTest(label=label):
+                self.assertContains(
+                    response, f'<tr><th scope="row">{label}</th><td>{value}</td></tr>', html=True
+                )
 
 
 class ExplorerTest(TestCase):
